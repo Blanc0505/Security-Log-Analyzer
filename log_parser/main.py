@@ -1,7 +1,6 @@
 import re
 
 def analyze_log(file_path):
-    suspicious_keywords = ["failed password", "error", "invalid user", "unathorized"]
     patterns = [
         re.compile(r"\bfailed password\b", re.IGNORECASE),
         re.compile(r"\binvalid user\b", re.IGNORECASE),
