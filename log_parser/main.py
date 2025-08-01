@@ -1,6 +1,22 @@
+import re
+
 def analyze_log(file_path):
     suspicious_keywords = ["failed password", "error", "invalid user", "unathorized"]
+    patterns = [
+        re.compile(r"\bfailed password\b", re.IGNORECASE),
+        re.compile(r"\binvalid user\b", re.IGNORECASE),
+        re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", re.IGNORECASE)
+    ] 
+
+    labels = {
+        r"\b\d{1,3}(?:\.\d{1,3}){3}\b": "IP-Pattern",
+        r"\bfailed password\b":       "Login-Failure",
+        r"\binvalid user\b":          "Invalid-User"
+    }
+
     with open(file_path, "r", encoding="utf-8") as file:
         for line in file:
-            if any(keyword in line.lower() for keyword in suspicious_keywords):
-                print("[WARNING] Suspicious Entry:", line.strip())
+            for pat in patterns:
+                if pat.search(line):
+                    print("[!] Regex warning:", labels[pat.pattern], "|", line.strip())
+                    break
