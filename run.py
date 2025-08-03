@@ -1,4 +1,4 @@
-from log_parser.main import analyze_log
+from log_parser.main import analyze_authLog
 import sys
 
 if __name__ == "__main__":
@@ -7,4 +7,4 @@ if __name__ == "__main__":
         sys.exit(1)
     logfile = sys.argv[1]
     print(f" Analyse von: {logfile}") #Debug
-    analyze_log(logfile)
+    analyze_authLog(logfile)
