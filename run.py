@@ -1,10 +1,13 @@
+import click
 from log_parser.main import analyze_authLog
-import sys
+
+@click.command()
+@click.argument("logfile", type=click.Path(exists=True))
+@click.option("--verbose", is_flag=True, help="more detailed output")
+
+def main(logfile, verbose):
+    print(f"Analyse von: {logfile}")
+    analyze_authLog(logfile, verbose=verbose)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: Python run.py <logfile>")
-        sys.exit(1)
-    logfile = sys.argv[1]
-    print(f" Analyse von: {logfile}") #Debug
-    analyze_authLog(logfile)
+    main()
