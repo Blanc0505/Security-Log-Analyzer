@@ -4,8 +4,9 @@ from collections import defaultdict, deque
 
 ip_events = defaultdict(lambda: deque())
 already_warned = set()
+summaryDict = defaultdict(lambda: {"failures": 0, "alarms": 0})
 
-def analyze_authLog(file_path, verbose=False, window=timedelta(seconds=60), threshold=5):
+def analyze_authLog(file_path, verbose_flag=False, summary_flag=False, window=timedelta(seconds=60), threshold=5):
     patterns = [
         re.compile(r"\bfailed password\b", re.IGNORECASE),
         re.compile(r"\binvalid user\b", re.IGNORECASE),
@@ -52,12 +53,13 @@ def analyze_authLog(file_path, verbose=False, window=timedelta(seconds=60), thre
                 if pat in (rx_success, rx_ip):
                     continue
                 label = labels.get(pat, pat.pattern)
-                if verbose:
+                if verbose_flag:
                     print("[!] Regex warning:", label, "|", line.strip())
 
                 if pat in (rx_failed, rx_invalid):
                     if timestamp is not None and ips:
                         for ip_str in ips:
+                            summaryDict[ip_str]["failures"] += 1
                             #print("ip/timestamp:", ip_str, timestamp)  DEBUG 
                             events = ip_events[ip_str]
                             events.append(timestamp)
@@ -66,9 +68,14 @@ def analyze_authLog(file_path, verbose=False, window=timedelta(seconds=60), thre
                                 events.popleft()
                             
                             if len(events) >= threshold and ip_str not in already_warned:
-                                print(f"[!!!] Brute-Force-Attack warning: IP {ip_str} has at least {len(events)} failed attempts in {window}")
+                                summaryDict[ip_str]["alarms"] += 1
+                                print(f"[!!!] Brute-Force-Attack warning: IP {ip_str} crossed the threshold ({threshold}) for failed attempts in {window}")
                                 already_warned.add(ip_str)
                             elif len(events) < threshold and ip_str in already_warned:
                                 #print("ip/count:", ip_str, len(events)) DEBUG
                                 already_warned.remove(ip_str)
                 break
+            if summary_flag:
+                for ip, stats in summaryDict.items():
+                    print(f"IP: {ip} --> Failures: {stats['failures']} | Alarms: {stats['alarms']}")
+
