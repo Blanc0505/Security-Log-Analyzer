@@ -3,10 +3,9 @@ from datetime import datetime, timedelta
 from collections import defaultdict, deque
 
 ip_events = defaultdict(lambda: deque())
-WINDOW = timedelta(seconds=10)
-THRESHOLD = 3
+already_warned = set()
 
-def analyze_authLog(file_path, verbose=False):
+def analyze_authLog(file_path, verbose=False, window=timedelta(seconds=60), threshold=5):
     patterns = [
         re.compile(r"\bfailed password\b", re.IGNORECASE),
         re.compile(r"\binvalid user\b", re.IGNORECASE),
@@ -59,13 +58,17 @@ def analyze_authLog(file_path, verbose=False):
                 if pat in (rx_failed, rx_invalid):
                     if timestamp is not None and ips:
                         for ip_str in ips:
-                            #print("DBG ip/timestamp:", ip_str, timestamp)  DEBUG 
+                            #print("ip/timestamp:", ip_str, timestamp)  DEBUG 
                             events = ip_events[ip_str]
                             events.append(timestamp)
 
-                            while events and (timestamp - events[0]) > WINDOW:
+                            while events and (timestamp - events[0]) > window:
                                 events.popleft()
                             
-                            if len(events) > THRESHOLD:
-                                print(f"[!] Brute-Force-Attack warning: IP {ip_str} has {len(events)} failed attempts in {WINDOW}")
+                            if len(events) >= threshold and ip_str not in already_warned:
+                                print(f"[!!!] Brute-Force-Attack warning: IP {ip_str} has at least {len(events)} failed attempts in {window}")
+                                already_warned.add(ip_str)
+                            elif len(events) < threshold and ip_str in already_warned:
+                                #print("ip/count:", ip_str, len(events)) DEBUG
+                                already_warned.remove(ip_str)
                 break
