@@ -1,10 +1,20 @@
 import re
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
+from typing import TypedDict
+
+class SummaryEntry(TypedDict):
+    failures: int
+    alarms: int
+    geo: str | None
+    flagged: bool
 
 ip_events = defaultdict(lambda: deque())
 already_warned = set()
-summaryDict = defaultdict(lambda: {"failures": 0, "alarms": 0})
+summaryDict: defaultdict[str, SummaryEntry] = defaultdict(
+    lambda: {"failures": 0, "alarms": 0, "geo": None, "flagged": False}
+)
+
 
 def analyze_authLog(file_path, verbose_flag=False, summary_flag=False, window=timedelta(seconds=60), threshold=5):
     patterns = [
@@ -45,7 +55,7 @@ def analyze_authLog(file_path, verbose_flag=False, summary_flag=False, window=ti
                 dt_str = f"{day_str} {month_str} {year} {time_str}"
                 timestamp = datetime.strptime(dt_str, "%d %b %Y %H:%M:%S")
             
-            ips = rx_ip.findall(line)
+            ips = rx_ip.findall(line)   
 
             for pat in patterns:
                 if not pat.search(line):
@@ -69,7 +79,8 @@ def analyze_authLog(file_path, verbose_flag=False, summary_flag=False, window=ti
                             
                             if len(events) >= threshold and ip_str not in already_warned:
                                 summaryDict[ip_str]["alarms"] += 1
-                                print(f"[!!!] Brute-Force-Attack warning: IP {ip_str} crossed the threshold ({threshold}) for failed attempts in {window}")
+                                summaryDict[ip_str]["flagged"] = True
+                                print(f"[!!!] Brute-Force-Attack warning: IP {ip_str} crossed the threshold ({threshold}) for failed attempts in time-window: {window}")
                                 already_warned.add(ip_str)
                             elif len(events) < threshold and ip_str in already_warned:
                                 #print("ip/count:", ip_str, len(events)) DEBUG
@@ -77,5 +88,4 @@ def analyze_authLog(file_path, verbose_flag=False, summary_flag=False, window=ti
                 break
             if summary_flag:
                 for ip, stats in summaryDict.items():
-                    print(f"IP: {ip} --> Failures: {stats['failures']} | Alarms: {stats['alarms']}")
-
+                    print(f"IP: {ip} --> Failures: {stats['failures']} | Alarms: {stats['alarms']} | Flagged: {stats['flagged']}")
