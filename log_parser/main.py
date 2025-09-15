@@ -4,10 +4,6 @@ from datetime import datetime, timedelta
 from collections import defaultdict, deque
 from typing import TypedDict
 
-VERTICAL_PORTS_THRESHOLD   = 5
-HORIZONTAL_HOSTS_THRESHOLD = 5
-SYN_BURST_THRESHOLD        = 10
-
 class SummaryEntry:
     def __init__(self) -> None:
         self.failures:      int = 0
@@ -133,7 +129,7 @@ def analyze_auth_log(file_path, verbose_flag=False, summary_flag_auth=False, win
             for ip, stats in summary_auth.items():
                 print(f"IP: {ip} --> Failures: {stats.failures} | Alarms: {stats.alarms} | Flagged: {stats.flagged}")
 
-def analyze_firewall_log(file_path, verbose_flag=False, summary_flag_fw=False, window=timedelta(seconds=60)):
+def analyze_firewall_log(file_path, verbose_flag=False, summary_flag_fw=False, window=timedelta(seconds=60), vert_ports=5, horz_hosts=5, syn_burst=10):
 
     IPV4 = r"\d{1,3}(?:\.\d{1,3}){3}" 
     rx_ts           = re.compile(r"^(?P<mon>[A-Za-z]{3})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})")
@@ -204,26 +200,26 @@ def analyze_firewall_log(file_path, verbose_flag=False, summary_flag_fw=False, w
                 print("DBG-keys", key_v, key_h)
             """
 
-            if dpt is not None:                                                 # vertical
-                dq = ports_by_src_dst[key_v]
+            if dpt is not None:                                     # vertical
+                dq = ports_by_src_dst[key_v]    
                 dq.append((timestamp, dpt))
                 prune_deque(dq, timestamp, window)
 
                 unique_ports = {p for (_, p) in dq if p is not None}
                 if verbose_flag:
                     print("DBG-vert", key_v, len(unique_ports))
-                if len(unique_ports) >= VERTICAL_PORTS_THRESHOLD and key_v not in warned_vertical:
+                if len(unique_ports) >= vert_ports and key_v not in warned_vertical:
                     print(f"[!!!] Port-Scan (vertical): SRC {src} --> DST {dst} touched {len(unique_ports)} unique ports in window {window}")
                     summary_fw[src].increment_alarm()
                     warned_vertical.add(key_v)
 
-            if dpt is not None and dst is not None:                                         # horizontal
+            if dpt is not None and dst is not None:                 # horizontal
                 dq = dsts_by_src_port[key_h]
                 dq.append((timestamp, dst))
                 prune_deque(dq,timestamp, window)
 
                 unique_dsts = {d for (_, d) in dq if d is not None}
-                if len(unique_dsts) >= HORIZONTAL_HOSTS_THRESHOLD and key_h not in warned_horizontal:
+                if len(unique_dsts) >= horz_hosts and key_h not in warned_horizontal:
                     print(f"[!!!] Port-Scan (horizontal): SRC {src} probed port {dpt} on {len(unique_dsts)} hosts in window {window}")
                     summary_fw[src].increment_alarm()
                     warned_horizontal.add(key_h)
@@ -233,7 +229,7 @@ def analyze_firewall_log(file_path, verbose_flag=False, summary_flag_fw=False, w
                 dq.append(timestamp)
                 prune_deque(dq, timestamp, window)
 
-                if len(dq) >= SYN_BURST_THRESHOLD and key_v not in warned_syn:
+                if len(dq) >= syn_burst and key_v not in warned_syn:
                     print(f"[!!!] SYN-burst: SRC {src} --> DST {dst} count={len(dq)} in window {window}")
                     summary_fw[src].increment_alarm()
                     warned_syn.add(key_v)
